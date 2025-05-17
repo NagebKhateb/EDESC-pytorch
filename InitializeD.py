@@ -1,6 +1,5 @@
 from collections import defaultdict
 import numpy as np
-import torch
 
 
 def seperate(Z, y_pred, n_clusters):

@@ -1,26 +1,23 @@
 from __future__ import print_function, division
 import argparse
-import os
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.metrics.cluster import normalized_mutual_info_score as nmi_score
-from sklearn.metrics import adjusted_rand_score as ari_score
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-from torch.nn import Linear
 from utils import LoadDataset, cluster_acc
-import tensorflow as tf  
-import keras.backend as K
 import warnings
 from AutoEncoder import AE
 from InitializeD import Initialization_D
 from Constraint import D_constraint1, D_constraint2
 import time
 warnings.filterwarnings("ignore")
+import matplotlib.pyplot as plt
+from IPython.display import display, clear_output
 
    
 class EDESC(nn.Module):
@@ -125,8 +122,35 @@ def pretrain_ae(model):
                                             total_loss / (batch_idx + 1)))
         torch.save(model.state_dict(), args.pretrain_path)
     print("Model saved to {}.".format(args.pretrain_path))
+
+plt.ion()
+fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+
+def live_plot(acc_list, nmi_list, max_acc_list, max_nmi_list):
+    ax.clear()
     
+    ax.plot(acc_list, label='Current Accuracy', marker='o', color='blue')
+    ax.plot(max_acc_list, label='Max Accuracy', linestyle='--', color='blue')
+    ax.plot(nmi_list, label='Current NMI', marker='s', color='green')
+    ax.plot(max_nmi_list, label='Max NMI', linestyle='--', color='green')
+        
+    ax.set_xlabel('Epoch')
+    ax.set_ylabel('Score')
+    ax.set_title('Clustering Performance per Epoch')
+    ax.legend()
+    ax.grid(True)
+    
+    plt.tight_layout()
+    plt.pause(2)
+
 def train_EDESC():
+    acc_list = []
+    nmi_list = []
+    max_acc_list = []
+    max_nmi_list = []
+
+    accmax = 0
+    nmimax = 0
 
     model = EDESC(
         n_enc_1=500,
@@ -187,6 +211,12 @@ def train_EDESC():
         y_pred_last = y_pred
         acc = cluster_acc(y, y_pred)
         nmi = nmi_score(y, y_pred)
+
+        acc_list.append(acc)
+        nmi_list.append(nmi)
+        max_acc_list.append(accmax)
+        max_nmi_list.append(nmimax)
+
         if acc > accmax:
             accmax = acc
         if nmi > nmimax:
@@ -194,6 +224,7 @@ def train_EDESC():
         print('Iter {}'.format(epoch), ':Current Acc {:.4f}'.format(acc),
                   ':Max Acc {:.4f}'.format(accmax),', Current nmi {:.4f}'.format(nmi), ':Max nmi {:.4f}'.format(nmimax))
         
+        live_plot(acc_list, nmi_list, max_acc_list, max_nmi_list)
 
         ############## Total loss function ######################
         loss = model.total_loss(data, x_bar, z, pred=s, target=s_tilde, dim=args.d, n_clusters = args.n_clusters, beta = args.beta)

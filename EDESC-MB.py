@@ -1,6 +1,5 @@
 from __future__ import print_function, division
 import argparse
-import os
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.metrics.cluster import normalized_mutual_info_score as nmi_score
@@ -11,10 +10,7 @@ import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-from torch.nn import Linear
 from utils import LoadDataset, cluster_acc
-import tensorflow as tf  
-import keras.backend as K
 import warnings
 from AutoEncoder import AE
 from InitializeD import Initialization_D

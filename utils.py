@@ -2,13 +2,6 @@ from __future__ import division, print_function
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-import torchvision
-from torchvision import datasets, transforms
-from sklearn.metrics.cluster import normalized_mutual_info_score as nmi_score
-from sklearn.metrics import adjusted_rand_score as ari_score
-import h5py
-import scipy.io
-from sklearn import preprocessing
 
 def load_reuters(data_path='./data/reuters'):
     import os
@@ -65,6 +58,6 @@ def cluster_acc(y_true, y_pred):
     w = np.zeros((D, D), dtype=np.int64)
     for i in range(y_pred.size):
         w[y_pred[i], y_true[i]] += 1
-    from sklearn.utils.linear_assignment_ import linear_assignment
-    ind = linear_assignment(w.max() - w)
-    return sum([w[i, j] for i, j in ind]) * 1.0 / y_pred.size
+    from scipy.optimize import linear_sum_assignment
+    row_ind, col_ind = linear_sum_assignment(w.max() - w)
+    return w[row_ind, col_ind].sum() * 1.0 / y_pred.size
