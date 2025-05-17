@@ -1,7 +1,7 @@
 from collections import defaultdict
 import numpy as np
 
-
+# فصل البيانات إلى مجموعات حسب العناقيد الأولية
 def seperate(Z, y_pred, n_clusters):
     n, d = Z.shape[0], Z.shape[1]
     Z_seperate = defaultdict(list)
@@ -13,6 +13,7 @@ def seperate(Z, y_pred, n_clusters):
                 Z_new[j][:] = Z[j].cpu().detach().numpy()
     return Z_seperate
 
+# استخلاص الفضاءات الجزئية وتوزيعها
 def Initialization_D(Z, y_pred, n_clusters, d):
     Z_seperate = seperate(Z, y_pred, n_clusters)
     Z_full = None

@@ -2,7 +2,10 @@ from __future__ import division, print_function
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+from scipy.optimize import linear_sum_assignment
 
+
+# Loading training data
 def load_reuters(data_path='./data/reuters'):
     import os
     if not os.path.exists(os.path.join(data_path, 'reutersidf10k.npy')):
@@ -36,28 +39,13 @@ class LoadDataset(Dataset):
             np.array(self.y[idx])), torch.from_numpy(np.array(idx))
 
 
-#######################################################
-# Evaluate Critiron
-#######################################################
-
-
+# Calculate clustering accuracy: Return accuracy in [0 ~ 1]
 def cluster_acc(y_true, y_pred):
-    """
-    Calculate clustering accuracy. Require scikit-learn installed
-
-    # Arguments
-        y: true labels, numpy.array with shape `(n_samples,)`
-        y_pred: predicted labels, numpy.array with shape `(n_samples,)`
-
-    # Return
-        accuracy, in [0,1]
-    """
     y_true = y_true.astype(np.int64)
     assert y_pred.size == y_true.size
     D = max(y_pred.max(), y_true.max()) + 1
     w = np.zeros((D, D), dtype=np.int64)
     for i in range(y_pred.size):
         w[y_pred[i], y_true[i]] += 1
-    from scipy.optimize import linear_sum_assignment
     row_ind, col_ind = linear_sum_assignment(w.max() - w)
     return w[row_ind, col_ind].sum() * 1.0 / y_pred.size

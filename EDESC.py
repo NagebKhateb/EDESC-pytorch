@@ -17,7 +17,6 @@ from Constraint import D_constraint1, D_constraint2
 import time
 warnings.filterwarnings("ignore")
 import matplotlib.pyplot as plt
-from IPython.display import display, clear_output
 
    
 class EDESC(nn.Module):
@@ -125,21 +124,28 @@ def pretrain_ae(model):
 
 plt.ion()
 fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+fig.patch.set_facecolor('#f5f5f5')
 
 def live_plot(acc_list, nmi_list, max_acc_list, max_nmi_list):
     ax.clear()
+    ax.set_facecolor('#f9f9f9')
     
-    ax.plot(acc_list, label='Current Accuracy', marker='o', color='blue')
-    ax.plot(max_acc_list, label='Max Accuracy', linestyle='--', color='blue')
-    ax.plot(nmi_list, label='Current NMI', marker='s', color='green')
-    ax.plot(max_nmi_list, label='Max NMI', linestyle='--', color='green')
+    ax.plot(acc_list, label='Current Accuracy', color='#1f77b4', linewidth=2)
+    ax.plot(max_acc_list, label='Max Accuracy', linestyle='--', color='#1f77b4', linewidth=2)
+    ax.plot(nmi_list, label='Current NMI', color='#2ca02c', linewidth=2)
+    ax.plot(max_nmi_list, label='Max NMI', linestyle='--', color='#2ca02c', linewidth=2)
         
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Score')
-    ax.set_title('Clustering Performance per Epoch')
-    ax.legend()
-    ax.grid(True)
+    ax.set_xlabel('Epoch', fontsize=14, fontweight='bold', fontname='Segoe UI')
+    ax.set_ylabel('Score', fontsize=14, fontweight='bold', fontname='Segoe UI')
+    ax.set_title('Clustering Performance per Epoch', fontsize=16, fontweight='bold', fontname='Segoe UI')
+    ax.legend(frameon=False, fontsize=12, loc='lower right')
+    ax.grid(True, linestyle=':', linewidth=0.7, alpha=0.7)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
     
+    ax.tick_params(axis='both', which='major', labelsize=12)
+
     plt.tight_layout()
     plt.pause(2)
 

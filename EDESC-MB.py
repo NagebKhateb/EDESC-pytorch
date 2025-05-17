@@ -3,7 +3,6 @@ import argparse
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.metrics.cluster import normalized_mutual_info_score as nmi_score
-from sklearn.metrics import adjusted_rand_score as ari_score
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,7 +16,7 @@ from InitializeD import Initialization_D
 from Constraint import D_constraint1, D_constraint2
 import time
 warnings.filterwarnings("ignore")
-
+import matplotlib.pyplot as plt
       
 class EDESC(nn.Module):
 
@@ -37,6 +36,15 @@ class EDESC(nn.Module):
         self.pretrain_path = pretrain_path
         self.n_clusters = n_clusters
 
+        """
+        n_enc_i: أبعاد طبقات المشفر
+        n_dec_i: أبعاد طبقات فك التشفير
+        n_input: بعد بيانات الإدخال
+        n_z: بعد الفضاء الكامن
+        n_clusters: عدد العناقيد
+        num_sample: عدد العينات
+        pretrain_path: مسار النموذج المدرب مسبقاً
+        """
         self.ae = AE(
             n_enc_1=n_enc_1,
             n_enc_2=n_enc_2,
@@ -47,7 +55,7 @@ class EDESC(nn.Module):
             n_input=n_input,
             n_z=n_z)	
        
-        # Subspace bases proxy
+        # Self-Expressiveness Layer
         self.D = Parameter(torch.Tensor(n_z, n_clusters))
 
         
@@ -58,6 +66,7 @@ class EDESC(nn.Module):
         self.ae.load_state_dict(torch.load(self.pretrain_path, map_location='cpu'))
         print('Load pre-trained model from', path)
 
+    # مصفوفة التقارب
     def forward(self, x):
         
         x_bar, z = self.ae(x)
@@ -65,7 +74,6 @@ class EDESC(nn.Module):
         s = None
         eta = args.eta
         
-        # Calculate subspace affinity
         for i in range(self.n_clusters):	
 			
             si = torch.sum(torch.pow(torch.mm(z,self.D[:,i*d:(i+1)*d]),2),1,keepdim=True)
@@ -77,15 +85,16 @@ class EDESC(nn.Module):
         s = (s.t() / torch.sum(s, 1)).t()
         return x_bar, s, z
 
+    # Loss function
     def total_loss(self, x, x_bar, z, pred, target, dim, n_clusters, beta):
 
-        # Reconstruction loss
+        # خسارة إعادة البناء
         reconstr_loss = F.mse_loss(x_bar, x)     
         
-        # Subspace clustering loss
+        # خسارة التجميع
         kl_loss = F.kl_div(pred.log(), target)
         
-        # Constraints
+        # التنظيم الهندسي
         d_cons1 = D_constraint1()
         d_cons2 = D_constraint2()
         loss_d1 = d_cons1(self.D)
@@ -96,13 +105,14 @@ class EDESC(nn.Module):
 
         return total_loss
 
-		
+
+# تحسين التقارب
 def refined_subspace_affinity(s):
     weight = s**2 / s.sum(0)
     return (weight.t() / weight.sum(1)).t()
 
+# Autoencoder التدريب الأولي لـ
 def pretrain_ae(model):
-
     train_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
     print(model)
     optimizer = Adam(model.parameters(), lr=args.lr)
@@ -122,7 +132,42 @@ def pretrain_ae(model):
         torch.save(model.state_dict(), args.pretrain_path)
     print("Model saved to {}.".format(args.pretrain_path))
     
+plt.ion()
+fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+fig.patch.set_facecolor('#f5f5f5')
+
+def live_plot(acc_list, nmi_list, max_acc_list, max_nmi_list):
+    ax.clear()
+    ax.set_facecolor('#f9f9f9')
+    
+    ax.plot(acc_list, label='Current Accuracy', color='#1f77b4', linewidth=2)
+    ax.plot(max_acc_list, label='Max Accuracy', linestyle='--', color='#1f77b4', linewidth=2)
+    ax.plot(nmi_list, label='Current NMI', color='#2ca02c', linewidth=2)
+    ax.plot(max_nmi_list, label='Max NMI', linestyle='--', color='#2ca02c', linewidth=2)
+        
+    ax.set_xlabel('Epoch', fontsize=14, fontweight='bold', fontname='Segoe UI')
+    ax.set_ylabel('Score', fontsize=14, fontweight='bold', fontname='Segoe UI')
+    ax.set_title('Clustering Performance per Epoch', fontsize=16, fontweight='bold', fontname='Segoe UI')
+    ax.legend(frameon=False, fontsize=12, loc='lower right')
+    ax.grid(True, linestyle=':', linewidth=0.7, alpha=0.7)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    
+    ax.tick_params(axis='both', which='major', labelsize=12)
+
+    plt.tight_layout()
+    plt.pause(2)
+
+# End-to-End Learning
 def train_EDESC():
+    acc_list = []
+    nmi_list = []
+    max_acc_list = []
+    max_nmi_list = []
+
+    accmax = 0
+    nmimax = 0
 
     model = EDESC(
         n_enc_1=500,
@@ -151,13 +196,8 @@ def train_EDESC():
     x_bar, hidden = model.ae(data)
     kmeans = KMeans(n_clusters=args.n_clusters, n_init=10) 
 
-    # Get clusters from Consine K-means
-    # ~ X = hidden.data.cpu().numpy()
-    # ~ length = np.sqrt((X**2).sum(axis=1))[:,None]
-    # ~ X = X / length
-    # ~ y_pred = kmeans.fit_predict(X)
     
-    # Get clusters from K-means
+    # تهيئة المراكز الأولية
     y_pred = kmeans.fit_predict(hidden.data.cpu().numpy())
     print("Initial Cluster Centers: ", y_pred)
 
@@ -174,7 +214,6 @@ def train_EDESC():
     for epoch in range(100):
         _, tmp_s, z = model(data)
 
-        # update refined subspace affinity#
         tmp_s = tmp_s.data            
         s_tilde = refined_subspace_affinity(tmp_s)
 
@@ -185,6 +224,12 @@ def train_EDESC():
         y_pred_last = y_pred
         acc = cluster_acc(y, y_pred)
         nmi = nmi_score(y, y_pred)
+
+        acc_list.append(acc)
+        nmi_list.append(nmi)
+        max_acc_list.append(accmax)
+        max_nmi_list.append(nmimax)
+
         if acc > accmax:
             accmax = acc
         if nmi > nmimax:
@@ -192,12 +237,13 @@ def train_EDESC():
         print('Iter {}'.format(epoch), ':Current Acc {:.4f}'.format(acc),
                   ':Max Acc {:.4f}'.format(accmax),', Current nmi {:.4f}'.format(nmi), ':Max nmi {:.4f}'.format(nmimax))
 
+        live_plot(acc_list, nmi_list, max_acc_list, max_nmi_list)
+
         for batch_idx, (x, _, idx) in enumerate(train_loader):
             x = x.to(device)
             idx = idx.to(device)
             x_bar, s, z = model(x)
             
-            # ~ y_pred = s.data.cpu().numpy().argmax(1).astype(np.float32)
 
             ############# Total loss function ###################
             loss = model.total_loss(x, x_bar, z, pred=s, target=s_tilde[idx.type(torch.int64)], dim=args.d, n_clusters = args.n_clusters, beta = args.beta)

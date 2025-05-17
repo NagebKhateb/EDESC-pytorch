@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Linear
 
+# Preparing data for clustering (Unsupervised)
 class AE(nn.Module):
 
     def __init__(self, n_enc_1, n_enc_2, n_enc_3, n_dec_1, n_dec_2, n_dec_3,
@@ -24,17 +25,20 @@ class AE(nn.Module):
 
     def forward(self, x):
 
-        # Encoder
+        # Encoder: Reduce dimensions
         enc_h1 = F.relu(self.enc_1(x))
         enc_h2 = F.relu(self.enc_2(enc_h1))
         enc_h3 = F.relu(self.enc_3(enc_h2))
 
+        # Latent Space
         z = self.z_layer(enc_h3)
 
-        # Decoder
+        # Decoder: Rebuild
         dec_h1 = F.relu(self.dec_1(z))
         dec_h2 = F.relu(self.dec_2(dec_h1))
         dec_h3 = F.relu(self.dec_3(dec_h2))
+
+        # Original data with lower resolution
         x_bar = self.x_bar_layer(dec_h3)
 
         return x_bar, z
